@@ -1,0 +1,293 @@
+pipeline {
+    agent any
+    
+    environment {
+        AWS_DEFAULT_REGION = 'us-east-1'
+        TF_VAR_bucket_name = "${env.BRANCH_NAME}-site-estatico-${env.BUILD_NUMBER}"
+        TF_VAR_environment = "${env.BRANCH_NAME == 'main' ? 'prod' : 'dev'}"
+        TF_VAR_project_name = 'static-website-cicd'
+        TF_IN_AUTOMATION = 'true'
+        TF_INPUT = 'false'
+    }
+    
+    parameters {
+        choice(
+            name: 'ACTION',
+            choices: ['plan', 'apply', 'destroy'],
+            description: 'Ação do Terraform a ser executada'
+        )
+        booleanParam(
+            name: 'AUTO_APPROVE',
+            defaultValue: false,
+            description: 'Aplicar automaticamente sem confirmação (apenas para dev)'
+        )
+    }
+    
+    stages {
+        stage('🏁 Checkout') {
+            steps {
+                echo '📥 Fazendo checkout do código...'
+                checkout scm
+                script {
+                    // Mostrar informações do build
+                    echo "🔍 Build Info:"
+                    echo "Branch: ${env.BRANCH_NAME}"
+                    echo "Build Number: ${env.BUILD_NUMBER}"
+                    echo "Action: ${params.ACTION}"
+                    echo "Bucket Name: ${env.TF_VAR_bucket_name}"
+                }
+            }
+        }
+        
+        stage('🔧 Setup Terraform') {
+            steps {
+                script {
+                    echo '⚙️ Configurando Terraform...'
+                    dir('terraform') {
+                        // Verificar versão do Terraform
+                        sh 'terraform version'
+                        
+                        // Inicializar Terraform
+                        sh 'terraform init -no-color'
+                        
+                        echo '✅ Terraform configurado com sucesso!'
+                    }
+                }
+            }
+        }
+        
+        stage('✅ Terraform Validate') {
+            steps {
+                echo '🔍 Validando configuração Terraform...'
+                dir('terraform') {
+                    sh 'terraform validate -no-color'
+                    echo '✅ Configuração Terraform válida!'
+                }
+            }
+        }
+        
+        stage('📊 Terraform Plan') {
+            when {
+                anyOf {
+                    expression { params.ACTION == 'plan' }
+                    expression { params.ACTION == 'apply' }
+                }
+            }
+            steps {
+                script {
+                    echo '📋 Executando Terraform Plan...'
+                    dir('terraform') {
+                        withCredentials([aws(credentialsId: 'aws-credentials', region: 'us-east-1')]) {
+                            sh '''
+                                terraform plan -no-color \
+                                    -var="aws_region=${AWS_DEFAULT_REGION}" \
+                                    -var="bucket_name=${TF_VAR_bucket_name}" \
+                                    -var="environment=${TF_VAR_environment}" \
+                                    -var="project_name=${TF_VAR_project_name}" \
+                                    -out=tfplan
+                            '''
+                        }
+                        echo '✅ Plan executado com sucesso!'
+                    }
+                }
+            }
+        }
+        
+        stage('🚀 Terraform Apply') {
+            when {
+                expression { params.ACTION == 'apply' }
+            }
+            steps {
+                script {
+                    echo '⚡ Aplicando mudanças Terraform...'
+                    
+                    // Aprovação manual para produção
+                    if (env.BRANCH_NAME == 'main' && !params.AUTO_APPROVE) {
+                        def userInput = input(
+                            message: '🔥 Aplicar mudanças em PRODUÇÃO?',
+                            ok: 'Aplicar',
+                            parameters: [
+                                choice(
+                                    name: 'CONFIRM',
+                                    choices: ['No', 'Yes'],
+                                    description: 'Confirmar aplicação em produção'
+                                )
+                            ]
+                        )
+                        
+                        if (userInput != 'Yes') {
+                            error '❌ Deploy cancelado pelo usuário'
+                        }
+                    }
+                    
+                    dir('terraform') {
+                        withCredentials([aws(credentialsId: 'aws-credentials', region: 'us-east-1')]) {
+                            sh 'terraform apply -no-color -auto-approve tfplan'
+                        }
+                        echo '✅ Apply executado com sucesso!'
+                    }
+                }
+            }
+        }
+        
+        stage('🌐 Get Website URL') {
+            when {
+                expression { params.ACTION == 'apply' }
+            }
+            steps {
+                script {
+                    echo '🔗 Obtendo URL do website...'
+                    dir('terraform') {
+                        withCredentials([aws(credentialsId: 'aws-credentials', region: 'us-east-1')]) {
+                            def websiteUrl = sh(
+                                script: 'terraform output -raw website_url',
+                                returnStdout: true
+                            ).trim()
+                            
+                            echo "🎉 Website URL: ${websiteUrl}"
+                            
+                            // Salvar URL como artefato
+                            writeFile file: '../website_url.txt', text: websiteUrl
+                            archiveArtifacts artifacts: 'website_url.txt', fingerprint: true
+                            
+                            // Exibir na saída
+                            echo """
+                            ╔══════════════════════════════════════╗
+                            ║          🚀 DEPLOY CONCLUÍDO!        ║
+                            ╠══════════════════════════════════════╣
+                            ║ URL: ${websiteUrl}
+                            ║ Ambiente: ${env.TF_VAR_environment}
+                            ║ Bucket: ${env.TF_VAR_bucket_name}
+                            ╚══════════════════════════════════════╝
+                            """.stripIndent()
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('🧪 Test Website') {
+            when {
+                expression { params.ACTION == 'apply' }
+            }
+            steps {
+                script {
+                    echo '🔍 Testando website...'
+                    dir('terraform') {
+                        withCredentials([aws(credentialsId: 'aws-credentials', region: 'us-east-1')]) {
+                            def websiteUrl = sh(
+                                script: 'terraform output -raw website_url',
+                                returnStdout: true
+                            ).trim()
+                            
+                            // Aguardar propagação do S3
+                            echo '⏱️ Aguardando propagação do S3 (30s)...'
+                            sleep 30
+                            
+                            // Testar se o site está acessível
+                            def response = sh(
+                                script: "curl -s -o /dev/null -w '%{http_code}' --connect-timeout 30 ${websiteUrl}",
+                                returnStdout: true
+                            ).trim()
+                            
+                            if (response == '200') {
+                                echo '✅ Website está funcionando corretamente!'
+                                echo "🌐 Acesse: ${websiteUrl}"
+                            } else {
+                                echo "⚠️ Website retornou código HTTP: ${response}"
+                                echo "🔄 Isso pode ser normal logo após o deploy. Tente acessar em alguns minutos."
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('💥 Terraform Destroy') {
+            when {
+                expression { params.ACTION == 'destroy' }
+            }
+            steps {
+                script {
+                    echo '🗑️ Destruindo recursos Terraform...'
+                    
+                    // Confirmação obrigatória para destroy
+                    def userInput = input(
+                        message: '⚠️ DESTRUIR todos os recursos?',
+                        ok: 'Destruir',
+                        parameters: [
+                            choice(
+                                name: 'CONFIRM_DESTROY',
+                                choices: ['No', 'Yes'],
+                                description: 'Confirmar destruição (IRREVERSÍVEL)'
+                            )
+                        ]
+                    )
+                    
+                    if (userInput != 'Yes') {
+                        error '❌ Destruição cancelada pelo usuário'
+                    }
+                    
+                    dir('terraform') {
+                        withCredentials([aws(credentialsId: 'aws-credentials', region: 'us-east-1')]) {
+                            sh '''
+                                terraform destroy -no-color -auto-approve \
+                                    -var="aws_region=${AWS_DEFAULT_REGION}" \
+                                    -var="bucket_name=${TF_VAR_bucket_name}" \
+                                    -var="environment=${TF_VAR_environment}" \
+                                    -var="project_name=${TF_VAR_project_name}"
+                            '''
+                        }
+                        echo '✅ Recursos destruídos com sucesso!'
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo '🧹 Limpando workspace...'
+            // Limpar arquivos terraform sensíveis
+            sh 'find . -name "*.tfstate*" -delete 2>/dev/null || true'
+            sh 'find . -name "tfplan" -delete 2>/dev/null || true'
+        }
+        
+        success {
+            script {
+                def message = ""
+                if (params.ACTION == 'apply') {
+                    def websiteUrl = readFile('website_url.txt').trim()
+                    message = """
+                    🎉 Deploy realizado com sucesso!
+                    🌐 URL: ${websiteUrl}
+                    🏷️ Ambiente: ${env.TF_VAR_environment}
+                    📦 Bucket: ${env.TF_VAR_bucket_name}
+                    """
+                } else {
+                    message = "✅ ${params.ACTION} executado com sucesso!"
+                }
+                
+                echo message
+                
+                // Se tiver configurado email, descomentar:
+                // emailext (
+                //     subject: "✅ Jenkins: ${env.JOB_NAME} - ${params.ACTION} Success",
+                //     body: message,
+                //     to: '${DEFAULT_RECIPIENTS}'
+                // )
+            }
+        }
+        
+        failure {
+            echo '❌ Pipeline falhou!'
+            
+            // Se tiver configurado email, descomentar:
+            // emailext (
+            //     subject: "❌ Jenkins: ${env.JOB_NAME} - ${params.ACTION} Failed",
+            //     body: "Build falhou. Verifique os logs: ${env.BUILD_URL}console",
+            //     to: '${DEFAULT_RECIPIENTS}'
+            // )
+        }
+    }
+}
