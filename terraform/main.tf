@@ -71,9 +71,9 @@ resource "aws_s3_bucket_policy" "static_website" {
 resource "aws_s3_object" "index_html" {
   bucket       = aws_s3_bucket.static_website.id
   key          = "index.html"
-  source       = "${path.module}/website/index.html"
+  source       = "${path.module}/../website/index.html"
   content_type = "text/html"
-  etag         = filemd5("${path.module}/website/index.html")
+  etag         = filemd5("${path.module}/../website/index.html")
 
   depends_on = [aws_s3_bucket_policy.static_website]
 }
@@ -82,9 +82,9 @@ resource "aws_s3_object" "index_html" {
 resource "aws_s3_object" "error_html" {
   bucket       = aws_s3_bucket.static_website.id
   key          = "error.html"
-  source       = "${path.module}/website/error.html"
+  source       = "${path.module}/../website/error.html"
   content_type = "text/html"
-  etag         = filemd5("${path.module}/website/error.html")
+  etag         = filemd5("${path.module}/../website/error.html")
 
   depends_on = [aws_s3_bucket_policy.static_website]
 }
