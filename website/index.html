@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bem-vindo ao Meu Site Estático</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 3rem;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            margin: 2rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .feature {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 1.5rem;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .feature h3 {
+            color: #ffd700;
+            margin-bottom: 0.5rem;
+        }
+
+        .tech-stack {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+        }
+
+        .tech-stack h3 {
+            color: #00ff88;
+            margin-bottom: 1rem;
+        }
+
+        .tech-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: center;
+        }
+
+        .tag {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.9rem;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .footer {
+            margin-top: 2rem;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 2rem;
+                margin: 1rem;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .features {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Bem-vindo!</h1>
+        <p class="subtitle">Site estático hospedado no Amazon S3 com Terraform</p>
+        
+        <div class="features">
+            <div class="feature">
+                <h3>🏗️ Infraestrutura como Código</h3>
+                <p>Provisionado automaticamente com Terraform seguindo as melhores práticas de DevOps</p>
+            </div>
+            <div class="feature">
+                <h3>☁️ Cloud Native</h3>
+                <p>Hospedado na AWS utilizando S3 para máxima disponibilidade e performance</p>
+            </div>
+            <div class="feature">
+                <h3>🔧 DevOps Ready</h3>
+                <p>Estrutura organizada e pronta para CI/CD com separação de ambientes</p>
+            </div>
+        </div>
+
+        <div class="tech-stack">
+            <h3>🛠️ Stack Tecnológica</h3>
+            <div class="tech-tags">
+                <span class="tag">Terraform</span>
+                <span class="tag">AWS S3</span>
+                <span class="tag">HTML5</span>
+                <span class="tag">CSS3</span>
+                <span class="tag">DevOps</span>
+                <span class="tag">IaC</span>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>✨ Criado com Terraform e hospedado no Amazon S3</p>
+            <p>🔄 Pronto para integração com pipelines de CI/CD</p>
+        </div>
+    </div>
+</body>
+</html>
