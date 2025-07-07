@@ -1,4 +1,3 @@
-# main.tf
 terraform {
   required_version = ">= 1.0"
   required_providers {
@@ -13,7 +12,6 @@ provider "aws" {
   region = var.aws_region
 }
 
-# Bucket S3 para hospedagem estática
 resource "aws_s3_bucket" "static_website" {
   bucket = var.bucket_name
 
@@ -24,7 +22,6 @@ resource "aws_s3_bucket" "static_website" {
   }
 }
 
-# Configuração de hospedagem estática
 resource "aws_s3_bucket_website_configuration" "static_website" {
   bucket = aws_s3_bucket.static_website.id
 
@@ -37,7 +34,6 @@ resource "aws_s3_bucket_website_configuration" "static_website" {
   }
 }
 
-# Configuração de ACL público
 resource "aws_s3_bucket_public_access_block" "static_website" {
   bucket = aws_s3_bucket.static_website.id
 
@@ -47,7 +43,6 @@ resource "aws_s3_bucket_public_access_block" "static_website" {
   restrict_public_buckets = false
 }
 
-# Política do bucket para acesso público de leitura
 resource "aws_s3_bucket_policy" "static_website" {
   bucket = aws_s3_bucket.static_website.id
 
@@ -67,24 +62,23 @@ resource "aws_s3_bucket_policy" "static_website" {
   depends_on = [aws_s3_bucket_public_access_block.static_website]
 }
 
-# Upload do arquivo index.html
+# CORREÇÃO: Usar path correto para os arquivos HTML
 resource "aws_s3_object" "index_html" {
   bucket       = aws_s3_bucket.static_website.id
   key          = "index.html"
-  source       = "${path.module}/website/index.html"
+  source       = "../website/index.html"
   content_type = "text/html"
-  etag         = filemd5("${path.module}/website/index.html")
+  etag         = filemd5("../website/index.html")
 
   depends_on = [aws_s3_bucket_policy.static_website]
 }
 
-# Upload do arquivo error.html
 resource "aws_s3_object" "error_html" {
   bucket       = aws_s3_bucket.static_website.id
   key          = "error.html"
-  source       = "${path.module}/website/error.html"
+  source       = "../website/error.html"
   content_type = "text/html"
-  etag         = filemd5("${path.module}/website/error.html")
+  etag         = filemd5("../website/error.html")
 
   depends_on = [aws_s3_bucket_policy.static_website]
 }
